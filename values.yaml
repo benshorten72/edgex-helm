@@ -666,3 +666,5 @@ edgex:
     # Writable pipeline functions HTTP export parameter URL
     httpExportURL: ""
     enableHostPort: false
+persistence:
+  size: 20Mi
