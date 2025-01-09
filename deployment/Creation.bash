@@ -21,6 +21,31 @@ while true; do
   fi
 done
 
+#!/bin/bash
+
+# Loop to get the starting IP range
+while true; do
+  read -p "Enter the cluster external starting IP range (e.g., 1,2,3...): " ip_start_range
+  if [[ "$ip_start_range" =~ ^[0-9]+$ ]]; then
+    break
+  else
+    echo "Invalid input. Please enter a numeric value."
+  fi
+done
+
+# Loop to get the ending IP range
+while true; do
+  read -p "Enter the cluster external ending IP range (e.g., 4,5,6...): " ip_end_range
+  if [[ "$ip_end_range" =~ ^[0-9]+$ ]] && [[ $ip_end_range -gt $ip_start_range ]]; then
+    break
+  else
+    echo "Invalid input. Please enter a numeric value greater than the starting IP range."
+  fi
+done
+
+# Output the provided range
+echo "You have defined the IP range as 172.100.150.$ip_start_range-172.100.150.$ip_end_range"
+
 echo "Creating docker subnet 172.100.0.0/16 for testbed"
 docker network create --subnet 172.100.0.0/16 testbed
 
@@ -32,8 +57,10 @@ kubectl config use-context k3d-$cluster_name
 helm repo add metallb https://metallb.github.io/metallb
 helm install metallb -n metallb --create-namespace metallb/metallb
 echo "Waiting for metallb to deploy..."
-sleep 5
+# DO not take out sleep, it breaks otherwise
+sleep 10
 kubectl wait -n metallb -l app.kubernetes.io/component=controller --for=condition=ready pod --timeout=120s
+kubectl wait -n metallb -l app.kubernetes.io/component=speaker --for=condition=ready pod --timeout=120s
 
 kubectl apply -f - <<EOF
 apiVersion: metallb.io/v1beta1
@@ -43,7 +70,7 @@ metadata:
   namespace: metallb
 spec:
   addresses:
-  - 172.100.150.0-172.100.150.20
+  - 172.100.150.${ip_start_range}-172.100.150.${ip_end_range}
 EOF
 
 kubectl apply -f - <<EOF
@@ -173,10 +200,6 @@ spec:
   type: ClusterIP
 EOF
 
-# Wait for the app-ingress service to be ready
-echo "Waiting for app-ingress service to be ready..."
-kubectl wait --for=condition=available --timeout=60s service/app-ingress -n default
-
 # Apply the ingress resource
 kubectl apply -f - <<EOF
 apiVersion: networking.k8s.io/v1
@@ -187,19 +210,27 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-  - host: app-ingress.local
+  - host: ${cluster_name}.local
     http:
       paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: edgex-core-command
+            port:
+              number: 59882
       - path: /
         pathType: Prefix
         backend:
           service:
-            name: app-ingress
+            name: edgex-ui
             port:
-              number: 80
+              number: 4000
 EOF
 
 INGRESS_LB_IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 echo "Add $INGRESS_LB_IP to /etc/hosts"
 
-echo "$INGRESS_LB_IP app-ingress.local" | sudo tee -a /etc/hosts
+echo "$INGRESS_LB_IP $cluster_name.local" | sudo tee -a /etc/hosts
+echo "Ingress ready on http://$cluster_name.local"
