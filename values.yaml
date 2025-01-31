@@ -5,7 +5,9 @@
 # Default values for Edgex.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
-
+tcp:
+  "1883": "default/mqtt-service:1883"  # Maps port 1883 to the MQTT service
+  "8883": "default/mqtt-service:8883" # Maps port 8883 to the MQTT service for TLS
 imagePullSecrets: []
 # supply a list of secret names (in the current namespace) of type docker-registry
 
@@ -666,3 +668,20 @@ edgex:
     # Writable pipeline functions HTTP export parameter URL
     httpExportURL: ""
     enableHostPort: false
+# services:
+#   device-mqtt:
+#     environment:
+#       DEVICE_DEVICESDIR: /custom-config/devices
+#       DEVICE_PROFILESDIR: /custom-config/profiles
+#     volumes:
+#     - /custom-config
+# ingress:
+#   enabled: true
+#   annotations:
+#     kubernetes.io/ingress.class: nginx
+#     nginx.ingress.kubernetes.io/rewrite-target: /
+#   hosts:
+#     - host: edgex.local
+#       paths:
+#         - /
+#   tls: []

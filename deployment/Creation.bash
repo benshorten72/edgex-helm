@@ -84,13 +84,8 @@ spec:
   - ip-pool
 EOF
 
-# Add the ingress-nginx Helm repository
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-helm repo update
-
 # Install the ingress-nginx Helm chart
-helm install ingress-nginx -n ingress-nginx --create-namespace ingress-nginx/ingress-nginx
-
+helm install ingress-nginx ingress-nginx/ -n ingress-nginx --create-namespace
 # Wait for the ingress-nginx controller pods to be ready
 echo "Waiting for ingress-nginx controller pods to be ready..."
 kubectl wait --namespace ingress-nginx \
@@ -199,34 +194,95 @@ spec:
     app: app-ingress
   type: ClusterIP
 EOF
-
+# kubectl apply -f - <<EOF
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: app-ingre
+#   namespace: default
+#   annotations:
+#     nginx.ingress.kubernetes.io/configuration-snippet: |
+#       more_set_headers "X-Original-URI: $request_uri";
+#     nginx.ingress.kubernetes.io/use-regex: "true"
+#     nginx.ingress.kubernetes.io/rewrite-target: /$2
+# spec:
+#   ingressClassName: nginx
+#   rules:
+#   - host: devicetesting.local
+#     http:
+#       paths:
+#       - path: /core-data(/|$)(.*)
+#         pathType: ImplementationSpecific
+#         backend:
+#           service:
+#             name: edgex-core-data
+#             port:
+#               number: 59880
+#       - path: /core-command(/|$)(.*)
+#         pathType: ImplementationSpecific
+#         backend:
+#           service:
+#             name: edgex-core-command
+#             port:
+#               number: 59882
+#       - path: /core-metadata(/|$)(.*)
+#         pathType: ImplementationSpecific
+#         backend:
+#           service:
+#             name: edgex-core-metadata
+#             port:
+#               number: 59881
+#       - path: /
+#         pathType: Prefix
+#         backend:
+#           service:
+#             name: edgex-ui
+#             port:
+#               number: 4000
 # Apply the ingress resource
 kubectl apply -f - <<EOF
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: app-ingress
+  name: app-ingre
   namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
 spec:
   ingressClassName: nginx
   rules:
   - host: ${cluster_name}.local
     http:
       paths:
-      - path: /api
-        pathType: Prefix
+      - path: /core-data(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: edgex-core-data
+            port:
+              number: 59880
+      - path: /core-command(/|$)(.*)
+        pathType: ImplementationSpecific
         backend:
           service:
             name: edgex-core-command
             port:
               number: 59882
+      - path: /core-metadata(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: edgex-core-metadata
+            port:
+              number: 59881
       - path: /
-        pathType: Prefix
+        pathType: Exact
         backend:
           service:
             name: edgex-ui
             port:
               number: 4000
+
 EOF
 
 INGRESS_LB_IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
@@ -234,3 +290,8 @@ echo "Add $INGRESS_LB_IP to /etc/hosts"
 
 echo "$INGRESS_LB_IP $cluster_name.local" | sudo tee -a /etc/hosts
 echo "Ingress ready on http://$cluster_name.local"
+
+# git clone https://github.com/edgexfoundry/edgex-helm.git
+# git checkout v3.0
+# kubectl create namespace edgex
+# helm install edgex-napa -n default edgex-helm

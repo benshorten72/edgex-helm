@@ -54,6 +54,7 @@ spec:
         {{- end}}
       {{- end}}
         env:
+        
         - name: SERVICE_HOST
           value: {{.Values.edgex.app.device.mqtt}}
       {{- if .Values.edgex.security.enabled }}
